@@ -23,3 +23,33 @@ Control Module Part Number: 8N0 906 018 BP
         P0118 - 35-00 -   -
 17931 -  Crash Signal from Airbag Controller: Implausible Signal
         P1523 - 35-00 -   -
+
+VCDS-Lite Version: Release 1.2
+Wednesday, 02 August 2023, 11:30:29:0
+Control Module Part Number: 8N0 906 018 BP
+  Component and/or Version: 1.8L R4/5VT         0002
+           Software Coding: 10710
+            Work Shop Code: WSC 01236
+                      VCID: 80738303931B
+           Additional Info: WAUZZZ8L631211893     AUZ7Z0B2287133
+10 Faults Found:
+18010 -  Power Supply Terminal 30: Voltage too Low
+        P1602 - 35-10 -   - - Intermittent
+18057 -  Powertrain Data Bus: Missing Message from ABS Controller
+        P1649 - 35-00 -   -
+18058 -  Powertrain Data Bus: Missing Message from Instrument Cluster
+        P1650 - 35-00 -   -
+17931 -  Crash Signal from Airbag Controller: Implausible Signal
+        P1523 - 35-00 -   -
+17834 -  EVAP Purge Valve (N80): Open Circuit
+        P1426 - 35-10 -   - - Intermittent
+17526 -  Oxygen (Lambda) Sensor Heating; B1 S2: Open Circuit
+        P1118 - 35-10 -   - - Intermittent
+17069 -  ECM Power Relay Control Circuit (J271): Open Circuit
+        P0685 - 35-00 -   -
+16622 -  Manifold Pressure / Boost Sensor (G31): Signal too High
+        P0238 - 35-00 -   -
+16497 -  Intake Air Temp. Sensor (G42): Signal too High
+        P0113 - 35-00 -   -
+16502 -  Engine Coolant Temp. Sensor (G62): Signal too High
+        P0118 - 35-00 -   -
