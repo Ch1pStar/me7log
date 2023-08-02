@@ -1,5 +1,6 @@
 import { autoDetect, } from '@serialport/bindings-cpp'
 import { SerialPort } from 'serialport'
+import P_CODES_TABLE from './pcodes.json' assert { type: "json" };;
 
 const WindowsBinding = autoDetect()
 const ports = (await WindowsBinding.list()).filter((p)=>[p.path=='COM2']);
@@ -130,7 +131,21 @@ const commandChecksum = (command) => {
     return csum
 }
 
-const sendCommand = async (command) => {
+const checkPositiveResponse = (response, positiveResByte, requestName = 'unnamed') => {
+	if(response instanceof Buffer) {
+		response = response[0];
+	}
+
+	if(response !== positiveResByte) {
+		console.error(`Error on ${requestName} request`, response.toString(16));
+
+		return false;
+	}
+
+	return true;
+}
+
+const sendCommand = async (command, positiveResByte, requestName) => {
 	let commandBuffer = Buffer.from(command, 'hex');
 	const cmdLen = commandBuffer.length;
 
@@ -152,50 +167,145 @@ const sendCommand = async (command) => {
 		data.push(await read());
 	}
 
-	let res = Buffer.concat(data);
+	let response = Buffer.concat(data);
 
-	if(!commandBuffer.equals(res)) {
+	if(!commandBuffer.equals(response)) {
 		console.error('Command echo does not equal sent command', commandBuffer, resConfirmation);
 		process.exit(1);
 	}
 
 	// next byte after the command echo is the length of the response
 	const responseLen = (await read())[0];
+	const responseStatus = (await read())[0];
+
+	if(!checkPositiveResponse(responseStatus, positiveResByte, requestName)) return;
 
 	data.length = 0;
 	// read the command response
-	for(let i=0;i<responseLen;i++) {
+	for(let i=0;i<responseLen-1;i++) {
 		data.push(await read());
 	}
 
 	// what does the last byte mean?
 	const responseChecksum = await read();
 
-	res = Buffer.concat(data);
+	response = Buffer.concat(data);
 
-	const resStr = res.toString().replace(/[\u{0080}-\u{FFFF}]/gu,"");
+	const responseStr = response.toString().replace(/[\u{0080}-\u{FFFF}]/gu,"");
 	const resObj = {
 		command: commandBuffer,
-		result: resStr,
-		raw: res,
+		responseStr,
+		response,
 	}
 
-	console.log(resObj)
+	return resObj;
+}
 
-	return res;
+const getECUId = async () => {
+	// reports the ECU part number and engine type
+	// 0x1A - readEcuIdentification, 0x9B - return all info in one response
+	const {responseStr} = await sendCommand('1A9b', 0x5a, 'readEcuIdentification');
+
+	console.log(`ECU ID: ${responseStr}`);
+}
+
+const startDiagS = async () => {
+	// 0x10 - start diagnostic session
+	// 0x86 - development session
+	// 0x64 - ???
+	const {response} = await sendCommand('108664', 0x50, 'startDiagnosticSession');
+
+	await port.update({baudRate: 57600});
+}
+
+const DTC_STATUS_SYMPTOMS = [
+	'no fault symptom available for this DTC',
+	'above maximum threshold',
+	'below minimum threshold',
+	'no signal',
+	'invalid signal',
+];
+const DTC_STORAGE_STATE = {
+	0b00: '(noDTCDetected) no DTC stored in non−volatile memory',
+	0b01: '(DTCNotPresent) A DTC was present. DTC stored in non−volatile memory.',
+	0b10: '(DTCMaturing−Intermittent) Insufficient data to consider the error ready for storage in non−volatile memory.',
+	0b11: '(DTCPresent) DTC stored in non−volatile memory',
+};
+
+const DTC_GROUPS = {
+	0b00: 'P',
+	0b01: 'C',
+	0b10: 'B',
+	0b11: 'U',
+}
+
+const parseDTCStatus = (status) => {
+	// first 4 bits - dtc symptom 
+	// { $x0 } 0000 no fault symptom available for this DTC
+	// { $x0 } 0001 above maximum threshold
+	// { $x0 } 0010 below minimum threshold
+	// { $x0 } 0100 no signal
+	// { $x0 } 1000 invalid signal
+	// 5th bit - readinesss flag, prob ignore
+	// 6th and 7th bit - storage state
+	// 0 0 noDTCDetected at time of request
+	// 0 1 DTCNotPresent at time of request
+	// 1 0 DTCMaturing−Intermittent at time of request
+	// 1 1 DTCPresent at time of request
+	// 8th bit - DTCWarningLampCalibrationStatus, dash warning light, ignore
+
+	const storageState = DTC_STORAGE_STATE[status>>5];
+	let symptom;
+
+	for(const [bit, str] of DTC_STATUS_SYMPTOMS.entries()) {
+		if((status & (1<<bit))) {
+			symptom = str;
+			break;
+		}
+	}
+
+	const statusStr = `${symptom}, ${storageState} (${status.toString(2).padStart(8, '0')})`;
+
+	return statusStr;
+}
+
+const readDTCs = async () => {
+	const {response} = await sendCommand('1800ff00', 0x58, 'ReadDiagnosticTroubleCodesByStatus')
+
+	// console.log('DTCs raw response');
+	// console.log(response.length)
+	// const response = Buffer.from('08056222068564023861060068060064011362011862152364', 'hex');
+	const numDTCs = response[0];
+	const allDtcData = response.slice(1);
+
+	console.log(`${numDTCs} Faults Found:`);
+
+	for(let i=0;i<numDTCs;i++) {
+		const dtcDataLen = 3;
+		const startOffset = dtcDataLen*i;
+
+
+		const dtcData = Buffer.from([allDtcData[startOffset], allDtcData[startOffset+1]]);
+		const dtcStatus = parseDTCStatus(Buffer.from([allDtcData[startOffset+2]])[0]);
+		const dtcVal = dtcData.readUInt16BE();
+
+		const dtcNumber0 = dtcVal & 0b1111;
+		const dtcNumber1 = dtcVal>>4 & 0b1111;
+		const dtcNumber2 = dtcVal>>8 & 0b1111;
+		const dtcNumber3 = (dtcVal>>12 & 0b1111);
+		const dtcGroup = DTC_GROUPS[(dtcVal>>14 & 0b11)]; 
+
+		const dtcNumber = [dtcNumber2, dtcNumber1, dtcNumber0].join('')
+		const codeStr = `${dtcGroup}${dtcNumber3}${dtcNumber}`;
+
+		console.log(`${codeStr} ${P_CODES_TABLE[codeStr]}`)
+		// console.log(`\t${dtcStatus}`)
+		console.log(`\t${dtcVal.toString(2).padStart(16, '0')}, ${dtcNumber2.toString(2).padStart(4, '0')} ${dtcNumber1.toString(2).padStart(4, '0')} ${dtcNumber0.toString(2).padStart(4, '0')}`)
+	}
+
 }
 
 await wakeupECU();
-
-// reports the ECU part number and engine type
-await sendCommand('1A9B');
-
-// 0x10 - start diagnostic session
-// 0x86 set baudrate
-// 0x64 - 57600
-const startDiagS = await sendCommand('108664');
-if(startDiagS[0] !== 0x50) {
-	console.log('Error on startDiagnosticSession request')
-}
-await port.update({baudRate: 57600});
-
+await getECUId();
+await startDiagS();
+await readDTCs();
