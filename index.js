@@ -305,7 +305,31 @@ const readDTCs = async () => {
 
 }
 
+const clearDts = async () => {
+	const res = await sendCommand('14ff00', 0x54, 'clearDiagnosticInformation');
+}
+
 await wakeupECU();
 await getECUId();
 await startDiagS();
 await readDTCs();
+
+// import { open } from 'node:fs/promises';
+
+// const buffer = Buffer.alloc(236);
+// const file = await open('./fastlogging_ramhandler.bin');
+
+// await file.read({buffer});
+
+// console.log(buffer.toString('hex'))
+
+// fist call
+// 05 23 - writeMemoryByAddress 
+// 00 E1 B0 04 - params, high byte, middle byte, low byte, memory size
+// BD - checksum
+
+// second call
+// 05 23
+// 00 E2 28 04
+// 36
+
