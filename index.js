@@ -9,7 +9,7 @@ const port = await WindowsBinding.open({
 	baudRate: 10400,
 	// rtsMode: 'enable',
 });
-
+let ecuAddress;
 
 const write = (str) => port.write(Buffer.from(str.replaceAll(' ', ''), 'hex'));
 const read = async (len = 1, offset = 0, timeout = 0) => {
@@ -96,7 +96,8 @@ const readInitBytes = async () => {
 
 	// read back complement
 	await new Promise((res)=>setTimeout(res, 10))
-	await read()
+	const readbackCompl = await read()
+	// console.log('readback complement', readbackCompl);
 
 	// read, expecting 0xee
 	// console.log('expect 0xee')
@@ -108,6 +109,7 @@ const readInitBytes = async () => {
 		process.exit(1);
 	}
 
+	ecuAddress = (0xff - confirmationByte).toString(16);
 }
 
 const wakeupECU = async () => {
@@ -137,7 +139,7 @@ const checkPositiveResponse = (response, positiveResByte, requestName = 'unnamed
 	}
 
 	if(response !== positiveResByte) {
-		console.error(`Error on ${requestName} request`, response.toString(16));
+		console.error(`Error on ${requestName} request, expected: ${positiveResByte.toString(16)}, got: ${response.toString(16)}`);
 
 		return false;
 	}
@@ -145,7 +147,7 @@ const checkPositiveResponse = (response, positiveResByte, requestName = 'unnamed
 	return true;
 }
 
-const sendCommand = async (command, positiveResByte, requestName) => {
+const sendCommand = async (command, requestName) => {
 	let commandBuffer = Buffer.from(command, 'hex');
 	const cmdLen = commandBuffer.length;
 
@@ -159,6 +161,7 @@ const sendCommand = async (command, positiveResByte, requestName) => {
 	command = command + csum.toString(16).padStart(2, '0');
 	commandBuffer = Buffer.concat([commandBuffer, Buffer.from([csum])]);
 
+	// console.log(`Command:`, commandBuffer);
 	await write(command);
 
 	let data = [];
@@ -169,6 +172,8 @@ const sendCommand = async (command, positiveResByte, requestName) => {
 
 	let response = Buffer.concat(data);
 
+	// console.log(`Echo:`, response);
+
 	if(!commandBuffer.equals(response)) {
 		console.error('Command echo does not equal sent command', commandBuffer, resConfirmation);
 		process.exit(1);
@@ -177,6 +182,9 @@ const sendCommand = async (command, positiveResByte, requestName) => {
 	// next byte after the command echo is the length of the response
 	const responseLen = (await read())[0];
 	const responseStatus = (await read())[0];
+	const positiveResByte = commandBuffer[1] + 0x40;
+
+	// console.log(`Response len: ${responseLen}, positive response byte: ${positiveResByte.toString(16)}`)
 
 	if(!checkPositiveResponse(responseStatus, positiveResByte, requestName)) return;
 
@@ -204,7 +212,7 @@ const sendCommand = async (command, positiveResByte, requestName) => {
 const getECUId = async () => {
 	// reports the ECU part number and engine type
 	// 0x1A - readEcuIdentification, 0x9B - return all info in one response
-	const {responseStr} = await sendCommand('1A9b', 0x5a, 'readEcuIdentification');
+	const {responseStr} = await sendCommand('1A9b', 'readEcuIdentification');
 
 	console.log(`ECU ID: ${responseStr}`);
 }
@@ -213,7 +221,7 @@ const startDiagS = async () => {
 	// 0x10 - start diagnostic session
 	// 0x86 - development session
 	// 0x64 - ???
-	const {response} = await sendCommand('108664', 0x50, 'startDiagnosticSession');
+	const {response} = await sendCommand('108664', 'startDiagnosticSession');
 
 	await port.update({baudRate: 57600});
 }
@@ -270,7 +278,7 @@ const parseDTCStatus = (status) => {
 }
 
 const readDTCs = async () => {
-	const {response} = await sendCommand('1800ff00', 0x58, 'ReadDiagnosticTroubleCodesByStatus')
+	const {response} = await sendCommand('1800ff00', 'ReadDiagnosticTroubleCodesByStatus')
 
 	// console.log('DTCs raw response');
 	// console.log(response.length)
@@ -306,13 +314,14 @@ const readDTCs = async () => {
 }
 
 const clearDts = async () => {
-	const res = await sendCommand('14ff00', 0x54, 'clearDiagnosticInformation');
+	const res = await sendCommand('14ff00', 'clearDiagnosticInformation');
 }
 
 await wakeupECU();
 await getECUId();
 await startDiagS();
 await readDTCs();
+
 
 // import { open } from 'node:fs/promises';
 
