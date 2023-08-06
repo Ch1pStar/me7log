@@ -66,15 +66,21 @@ export default class KLine {
 		return this.port.write(Buffer.from(str.replaceAll(' ', ''), 'hex'))
 	}
 
-	async sendCommand(command, requestName) {
+	async sendCommand(command, requestName, skipLenPrepend = false, responseLen) {
+		if(this.isDebug) {
+			console.time(`${requestName} total time`);
+		}
 		const port = this.port;
 
 		let commandBuffer = Buffer.from(command, 'hex');
-		const cmdLen = commandBuffer.length;
 
-		// prepen the command length
-		commandBuffer = Buffer.concat([Buffer.from([cmdLen]), commandBuffer]);
-		command = cmdLen.toString(16).padStart(2, '0') + command;
+		if(!skipLenPrepend) {
+			const cmdLen = commandBuffer.length;
+
+			// prepen the command length
+			commandBuffer = Buffer.concat([Buffer.from([cmdLen]), commandBuffer]);
+			command = cmdLen.toString(16).padStart(2, '0') + command;
+		}
 
 		// append the command checksum
 		const csum = this.commandChecksum(commandBuffer);
@@ -82,7 +88,8 @@ export default class KLine {
 		command = command + csum.toString(16).padStart(2, '0');
 		commandBuffer = Buffer.concat([commandBuffer, Buffer.from([csum])]);
 
-		// console.log(`Command:`, commandBuffer);
+		if(this.isDebug) console.log(`Command:`, commandBuffer);
+
 		await this.write(command);
 
 		let data = [];
@@ -93,21 +100,21 @@ export default class KLine {
 
 		let response = Buffer.concat(data);
 
-		// console.log(`Echo:`, response);
+		if(this.isDebug) console.log(`Echo:`, response);
 
 		if(!commandBuffer.equals(response)) {
-			console.error('Command echo does not equal sent command', commandBuffer, resConfirmation);
+			console.error('Command echo does not equal sent command', commandBuffer, response);
 			process.exit(1);
 		}
 
 		// next byte after the command echo is the length of the response
-		const responseLen = (await this.read())[0];
+		if(!responseLen) responseLen = (await this.read())[0];
 		const responseStatus = (await this.read())[0];
 		const positiveResByte = commandBuffer[1] + 0x40;
 
-		// console.log(`Response len: ${responseLen}, positive response byte: ${positiveResByte.toString(16)}`)
+		if(this.isDebug) console.log(`Response len: ${responseLen}, positive response byte: ${positiveResByte.toString(16)}`)
 
-		if(!this.checkPositiveResponse(responseStatus, positiveResByte, requestName)) return;
+		// if(!this.checkPositiveResponse(responseStatus, positiveResByte, requestName)) return;
 
 		data.length = 0;
 		// read the command response
@@ -125,6 +132,10 @@ export default class KLine {
 			command: commandBuffer,
 			responseStr,
 			response,
+		}
+
+		if(this.isDebug) {
+			console.timeEnd(`${requestName} total time`);
 		}
 
 		return resObj;
@@ -201,13 +212,13 @@ export default class KLine {
 		// send complement to last byte
 		const complement = (0xff - lastByte).toString(16)
 		await new Promise((res)=>setTimeout(res, 20))
-		console.log('sending complement', complement)
+		if(this.isDebug) console.log('sending complement', complement)
 		await this.write(complement);
 
 		// read back complement
 		await new Promise((res)=>setTimeout(res, 10))
 		const readbackCompl = await this.read()
-		console.log('readback complement', readbackCompl);
+		if(this.isDebug) console.log('readback complement', readbackCompl);
 
 		// read, expecting 0xee
 		// console.log('expect 0xee')
@@ -221,8 +232,8 @@ export default class KLine {
 
 		this.ecuAddress = (0xff - confirmationByte).toString(16);
 
-		console.log('Confirmation byte: ', confirmationByte.toString(16));
-		console.log('ECU address: ', this.ecuAddress);
+		if(this.isDebug) console.log('Confirmation byte: ', confirmationByte.toString(16));
+		if(this.isDebug) console.log('ECU address: ', this.ecuAddress);
 	}
 
 	async wakeupECU() {
