@@ -1,8 +1,8 @@
 {
-  "name": "my-webpack-project",
+  "name": "me7log",
   "version": "1.0.0",
-  "description": "My webpack project",
-  "main": "index.js",
+  "description": "JS data logger for ME7 ECUs, based on me7logger",
+  "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --mode=production --node-env=production",
@@ -14,17 +14,7 @@
   "type": "module",
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "@babel/preset-env": "^7.22.9",
-    "@webpack-cli/generators": "^3.0.7",
-    "babel-loader": "^9.1.3",
-    "html-webpack-plugin": "^5.5.3",
-    "serialport": "^11.0.0",
-    "webpack": "^5.88.2",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
-  },
   "dependencies": {
-    "ftdi-js": "^0.3.0"
+    "serialport": "^11.0.0"
   }
 }

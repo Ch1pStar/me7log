@@ -27,7 +27,7 @@ export default class KWP2000 extends KLine {
 		this.loggedVarsAddress = '0300f89a38099138099d3809f6380a32';
 
 		this.varsConfig = await readECUFile('./ecu_files/8N0906018BP 0002.ecu');
-		this.latestData = new Array(this.loggedVars.length);
+		this.latestData = new Float32Array(this.loggedVars.length);
 	}
 
 	async breakToggle() {
@@ -170,8 +170,6 @@ export default class KWP2000 extends KLine {
 		// const data = Buffer.from('5e00e8', 'hex');
 		let offset = 0;
 
-		console.log(data)
-
 		this.loggedVars.forEach((varName, i)=>{
 			const varConfig = this.varsConfig[varName];
 			// console.log(varName, offset)
@@ -181,8 +179,9 @@ export default class KWP2000 extends KLine {
 			this.latestData[i] = physVal;
 			offset += varConfig.size;
 
+			// console.log(this.latestData)
 			// console.log(`${varConfig.alias}: ${internalVal.toString(16)}, ${physVal}${varConfig.unit}`);
-			console.log(`${varConfig.alias}: ${physVal}${varConfig.unit}`);
+			// console.log(`${varConfig.alias}: ${physVal}${varConfig.unit}`);
 		});
 
 		// console.log('---------------------------------------------------')
