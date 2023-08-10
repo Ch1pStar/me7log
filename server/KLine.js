@@ -1,6 +1,6 @@
 import { autoDetect } from '@serialport/bindings-cpp'
 import { SerialPort } from 'serialport'
-import P_CODES_TABLE from './pcodes.json' assert { type: "json" };
+import P_CODES_TABLE from '../dtcs/pcodes.json' assert { type: "json" };
 
 const DTC_STATUS_SYMPTOMS = [
 	'no fault symptom available for this DTC',

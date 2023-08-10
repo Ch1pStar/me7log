@@ -1,0 +1,17 @@
+logging flow
+
+reads:
+	address: 00 e1 b0, val: 00 00 86 2b - possibly bootrom version
+	address: 00 e2 28, val: d0 27 06 0b - pointer location
+
+writes:
+	write handler to memory in chunks of 80 bytes, starting at 38 7a 00
+	read back the handler to verify
+	write our handler addr(00 3A E1 00) to the pointer addr(00 e2 28)
+
+test handler
+start calling handler with service id b7, positive response is f7
+
+
+
+handler bytes:
