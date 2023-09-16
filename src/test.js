@@ -4,21 +4,22 @@ import KLine from './KLine.js';
 import ISO9141 from './ISO9141.js';
 import KWP2000 from './KWP2000.js';
 
-connectKWP();
-// connectISO9141();
+// connectKWP();
+connectISO9141();
 
 async function connectISO9141() {
 	const diag = new ISO9141({isDebug: false});
 
 	await diag.init();
 	await diag.wakeupECU();
+	await diag.readDTCs();
 
-	while(true) {
-		// console.time('rpm request');
-		const rpm = await diag.getEngineSpeed();
-		console.log(rpm)
-		// console.timeEnd('rpm request');
-	}
+	// while(true) {
+	// 	// console.time('rpm request');
+	// 	const rpm = await diag.getEngineSpeed();
+	// 	console.log(rpm)
+	// 	// console.timeEnd('rpm request');
+	// }
 }
 
 async function connectKWP() {

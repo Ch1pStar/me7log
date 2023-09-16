@@ -308,8 +308,9 @@ export default class KLine {
 		// const response = Buffer.from('08056222068564023861060068060064011362011862152364', 'hex');
 		const numDTCs = response[0];
 		const allDtcData = response.slice(1);
+		let outStr = `${numDTCs} Faults Found:\n`;
 
-		console.log(`${numDTCs} Faults Found:`);
+		console.log(outStr);
 
 		for(let i=0;i<numDTCs;i++) {
 			const dtcDataLen = 3;
@@ -328,15 +329,20 @@ export default class KLine {
 			const dtcNumber = [dtcNumber2, dtcNumber1, dtcNumber0].join('')
 			const codeStr = `${dtcGroup}${dtcNumber3}${dtcNumber}`;
 
-			console.log(`${codeStr} ${P_CODES_TABLE[codeStr]}`)
-			// console.log(`\t${dtcStatus}`)
-			console.log(`\t${dtcVal.toString(2).padStart(16, '0')}, ${dtcNumber2.toString(2).padStart(4, '0')} ${dtcNumber1.toString(2).padStart(4, '0')} ${dtcNumber0.toString(2).padStart(4, '0')}`)
+			outStr += `${codeStr} ${P_CODES_TABLE[codeStr]}\n`;
+			outStr += `\t${dtcVal.toString(2).padStart(16, '0')}, ${dtcNumber2.toString(2).padStart(4, '0')} ${dtcNumber1.toString(2).padStart(4, '0')} ${dtcNumber0.toString(2).padStart(4, '0')}\n`;
 		}
 
+		console.log(outStr);
+
+		return {
+			str: outStr,
+			buffer: response,
+		};
 	}
 
 	async clearDts() {
-		const res = await this.sendCommand('14ff00', 'clearDiagnosticInformation');
+		return this.sendCommand('14ff00', 'clearDiagnosticInformation');
 	}
 
 }

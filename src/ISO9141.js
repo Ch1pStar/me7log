@@ -12,6 +12,12 @@ export default class ISO9141 extends KLine {
 		return speed;
 	}
 
+	async readDTCs() {
+		const resLen = 7;
+		const { response } = await this.sendCommand('03000703', resLen);
+
+		console.log(response)
+	}
 
 	async breakToggle() {
 		const port = this.port;
